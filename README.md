@@ -20,10 +20,16 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   edit dimatikan: teks, pensil, ceklis, tanda tangan, geser, ubah ukuran,
   hapus. Scroll tetap bisa, memilih elemen tetap bisa. Buka kunci dulu
   baru bisa mengedit lagi.
-- **Geser tanda tangan** — seret langsung di halaman (di HP, gestur seret
-  pada tanda tangan kini tidak lagi direbut jadi scroll) atau pakai tombol
-  arah ← ↑ ↓ → (geser 6pt per ketuk, berlaku untuk tanda tangan yang
-  terpilih atau terakhir ditempel).
+- **Geser elemen** — seret langsung di halaman (di HP, gestur seret
+  pada elemen kini tidak lagi direbut jadi scroll) atau pakai tombol
+  arah ← ↑ ↓ → (geser 6pt per ketuk, berlaku untuk elemen yang terpilih
+  atau tanda tangan terakhir ditempel). Berlaku untuk tanda tangan,
+  ceklis (di mode Ceklis, seret centang yang ada untuk memindahkannya;
+  lepas tanpa geser = batalkan centang), teks, dan coretan pensil.
+- **Zoom cubit dua jari** — di HP, cubit/mekarkan dua jari di atas halaman
+  untuk zoom in/out; zoom mengarah ke titik tengah cubitan (bukan ke tengah
+  halaman), jadi bisa menargetkan area yang ingin diperbesar. Tombol
+  − / + tetap tersedia.
 - **Deteksi kotak & field** — tombol *Deteksi kotak & field* akan mencari:
   1. field formulir asli di PDF (kotak ceklis dan kolom tanda tangan), dan
   2. kotak kosong bergaris di halaman (untuk formulir hasil cetak/flatten).
