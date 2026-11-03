@@ -22,10 +22,12 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   baru bisa mengedit lagi.
 - **Geser elemen** — seret langsung di halaman (di HP, gestur seret
   pada elemen kini tidak lagi direbut jadi scroll) atau pakai tombol
-  arah ← ↑ ↓ → (geser 6pt per ketuk, berlaku untuk elemen yang terpilih
-  atau tanda tangan terakhir ditempel). Berlaku untuk tanda tangan,
-  ceklis (di mode Ceklis, seret centang yang ada untuk memindahkannya;
-  lepas tanpa geser = batalkan centang), teks, dan coretan pensil.
+  arah yang terpisah: **Geser tanda tangan** ← ↑ ↓ → dan **Geser
+  ceklis** ← ↑ ↓ → (geser 6pt per ketuk). Tombol tanda tangan
+  menggerakkan tanda tangan terpilih/terakhir ditempel; tombol ceklis
+  menggerakkan centang terpilih/terakhir dibuat — tidak perlu
+  memilih dulu. Di mode Ceklis, seret centang yang ada juga bisa
+  memindahkannya (lepas tanpa geser = batalkan centang).
 - **Zoom cubit dua jari** — di HP, cubit/mekarkan dua jari di atas halaman
   untuk zoom in/out; zoom mengarah ke titik tengah cubitan (bukan ke tengah
   halaman), jadi bisa menargetkan area yang ingin diperbesar. Tombol
