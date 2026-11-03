@@ -35,6 +35,11 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   tengahnya), dan slider ceklis otomatis mengikuti ukuran centang
   yang dibuat/dipilih. Tidak ada lagi outline biru penanda terpilih
   di halaman — tampilan bersih saat menggeser/mengubah ukuran.
+- **Pas kan ke kotak** — kalau centang sudah terlanjur digeser atau
+  diubah ukurannya sampai keluar dari kotaknya, satu ketuk tombol
+  ini mengembalikannya persis ke tengah kotak asalnya dengan ukuran
+  pas (sisi terpendek kotak). Centang baru juga menyimpan ukuran
+  kotaknya, jadi tombol ini selalu tepat.
 - **Zoom cubit dua jari** — di HP, cubit/mekarkan dua jari di atas halaman
   untuk zoom in/out; zoom mengarah ke titik tengah cubitan (bukan ke tengah
   halaman), jadi bisa menargetkan area yang ingin diperbesar. Tombol
