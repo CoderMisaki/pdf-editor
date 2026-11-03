@@ -106,6 +106,23 @@ $('#checkSizeInput').addEventListener('input', (e) => {
 });
 $('#btnCheckSizeMinus').addEventListener('click', () => stepSlider('#checkSizeInput', -1));
 $('#btnCheckSizePlus').addEventListener('click', () => stepSlider('#checkSizeInput', 1));
+$('#btnFitCheck').addEventListener('click', () => {
+  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk mengubah centang.'); return; }
+  let el = findSelected();
+  if ((!el || el.type !== 'check') && lastCheckId) {
+    for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastCheckId); if (f) { el = f; selectedId = f.id; break; } }
+  }
+  if (!el || el.type !== 'check') { setHint('Belum ada centang untuk dipaskan ke kotak.'); return; }
+  // Kembalikan centang persis ke tengah kotak asalnya (ukuran = sisi terpendek kotak).
+  // Centang lama tanpa boxW/boxH diasumsikan kotaknya persegi sebesar size awalnya.
+  const bw = el.boxW || el.size, bh = el.boxH || el.size;
+  const s = Math.min(bw, bh), cx = el.boxX + bw / 2, cy = el.boxY + bh / 2;
+  pushHistory();
+  el.size = s; el.x = cx - s / 2; el.y = cy - s / 2;
+  el.points = [[cx - s * 0.35, cy + s * 0.05], [cx - s * 0.08, cy + s * 0.32], [cx + s * 0.38, cy - s * 0.32]];
+  $('#checkSizeInput').value = s; $('#checkSizeVal').textContent = s;
+  renderOverlays(); setHint('Centang sudah pas di tengah kotak.');
+});
 function doUndo() {
   if (!history.length) return;
   redoStack.push(JSON.stringify(elements));
@@ -320,7 +337,7 @@ function attachOverlay(overlay, pageNum) {
       else {
         // Centang selalu terpusat di tengah kotak, berapa pun bentuk kotaknya.
         const size = Math.min(box.w, box.h), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-        const cel = { id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
+        const cel = { id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, boxW: box.w, boxH: box.h, color: $('#colorInput').value,
           points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 };
         els(pageNum).push(cel);
         lastCheckId = cel.id; // tombol arah "Geser ceklis" menggerakkan centang terakhir ini
