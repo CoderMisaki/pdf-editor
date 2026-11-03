@@ -188,7 +188,7 @@ function renderEl(el, pageNum) {
   const s = zoom;
   if (el.type === 'text') {
     const d = document.createElement('div');
-    d.className = 'el el-text' + (el.id === selectedId ? ' selected' : '');
+    d.className = 'el el-text';
     d.dataset.id = el.id;
     d.style.left = el.x * s + 'px'; d.style.top = el.y * s + 'px';
     d.style.fontSize = el.size * s + 'px'; d.style.color = el.color;
@@ -197,7 +197,7 @@ function renderEl(el, pageNum) {
   }
   if (el.type === 'draw' || el.type === 'check') {
     const d = document.createElement('div');
-    d.className = 'el' + (el.id === selectedId ? ' selected' : '');
+    d.className = 'el';
     d.dataset.id = el.id;
     const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
     const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys);
@@ -215,7 +215,7 @@ function renderEl(el, pageNum) {
   }
   if (el.type === 'sig') {
     const d = document.createElement('div');
-    d.className = 'el el-sig' + (el.id === selectedId ? ' selected' : '');
+    d.className = 'el el-sig';
     d.dataset.id = el.id;
     d.style.left = el.x * s + 'px'; d.style.top = el.y * s + 'px';
     d.style.width = el.w * s + 'px'; d.style.height = el.h * s + 'px';
