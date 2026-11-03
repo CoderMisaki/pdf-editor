@@ -748,10 +748,85 @@ $('#btnDetect').addEventListener('click', async () => {
 });
 
 /* ---------- Simpan PDF ---------- */
+// Kunci form ("apply") saat unduh: bakar isi tiap kolom form ke konten halaman,
+// lalu hapus semua widget + definisi form. Hasil unduhan jadi konten statis yang
+// tampil persis seperti di editor di viewer mana pun — tidak ada lagi kolom yang
+// bisa di-highlight viewer (kuning/hijau). File asli tidak diubah; yang dikunci
+// hanya hasil unduhan. flatten() bawaan pdf-lib TIDAK dipakai: ia gagal di tengah
+// jalan untuk file ini (kotak Off tanpa tampilan Off, c1_02) dan meninggalkan
+// dokumen setengah terkunci. Versi manual ini tahan terhadap kasus itu: kolom
+// kosong (termasuk Off) cukup dihapus widgetnya, tampilannya yang tercetak di
+// halaman tetap tampil. Catatan: tampilan kolom (appearance) di pdf-lib berupa
+// PDFRawStream, BUKAN PDFDict — pengecekan tipe harus memperhitungkan itu.
+function flattenForm(doc) {
+  const { PDFName, PDFDict, PDFRef, PDFArray, PDFRawStream,
+    pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PDFLib;
+  // Lookup bertipe pdf-lib MELEMPAR bila key tidak ada, jadi semua key opsional
+  // diselesaikan lewat helper ini + pengecekan instanceof.
+  const deref = (o) => (!o ? undefined : (o instanceof PDFRef ? doc.context.lookup(o) : o));
+  const subName = (o) => { const s = deref(o); return s instanceof PDFName ? (s.decodeText ? s.decodeText() : String(s)) : null; };
+  if (!doc.catalog.get(PDFName.of('AcroForm'))) return; // tanpa form, tidak ada yang dikunci
+  const form = doc.getForm();
+  if (!form.getFields().length) return;
+  try { form.updateFieldAppearances(); } catch (e) { /* lanjut dengan tampilan yang sudah ada */ }
+  let counter = 0;
+  for (let pi = 0; pi < doc.getPageCount(); pi++) {
+    const page = doc.getPage(pi);
+    let annots;
+    try { annots = page.node.Annots(); } catch (e) { annots = undefined; }
+    if (!annots) continue;
+    const keep = [];
+    const baked = [];
+    for (let ai = 0; ai < annots.size(); ai++) {
+      const ref = annots.get(ai);
+      const w = deref(ref);
+      if (!(w instanceof PDFDict)) { keep.push(ref); continue; }
+      if (subName(w.get(PDFName.of('Subtype'))) !== 'Widget') { keep.push(ref); continue; }
+      let ap = null;
+      const apDict = deref(w.get(PDFName.of('AP')));
+      if (apDict instanceof PDFDict) {
+        const n = deref(apDict.get(PDFName.of('N')));
+        if (n instanceof PDFRawStream) ap = n;
+        else if (n instanceof PDFDict && subName(n.get(PDFName.of('Subtype'))) === 'Form') ap = n;
+        else if (n instanceof PDFDict) { // peta status (kotak centang/radio)
+          const state = deref(w.get(PDFName.of('AS'))) || deref(w.get(PDFName.of('V')));
+          const entry = state ? deref(n.get(state)) : null;
+          if (entry instanceof PDFRawStream || entry instanceof PDFDict || entry instanceof PDFRef) ap = entry;
+        } else if (n instanceof PDFRef) ap = n;
+      }
+      const rectRaw = deref(w.get(PDFName.of('Rect')));
+      if (ap && rectRaw instanceof PDFArray) baked.push({ ap, rect: rectRaw.asRectangle() });
+      // Widget selalu dihapus: sudah dibakar, atau memang kosong (kolom Off).
+    }
+    if (baked.length) {
+      const resources = page.node.Resources();
+      let xobj = deref(resources.get(PDFName.of('XObject')));
+      if (!(xobj instanceof PDFDict)) { xobj = doc.context.obj({}); resources.set(PDFName.of('XObject'), xobj); }
+      for (const b of baked) {
+        const apRef = b.ap instanceof PDFRef ? b.ap : doc.context.register(b.ap);
+        const apObj = doc.context.lookup(apRef);
+        const apDictForBBox = apObj instanceof PDFRawStream ? apObj.dict : apObj;
+        const bboxArr = deref(apDictForBBox.get(PDFName.of('BBox')));
+        if (!(bboxArr instanceof PDFArray)) continue;
+        const bb = bboxArr.asRectangle();
+        if (!bb.width || !bb.height) continue;
+        const sx = b.rect.width / bb.width, sy = b.rect.height / bb.height;
+        const tx = b.rect.x - bb.x * sx, ty = b.rect.y - bb.y * sy;
+        const name = PDFName.of('Flat' + (counter++));
+        xobj.set(name, apRef);
+        page.pushOperators(pushGraphicsState(), concatTransformationMatrix(sx, 0, 0, sy, tx, ty), drawObject(name), popGraphicsState());
+      }
+    }
+    if (keep.length) page.node.set(PDFName.of('Annots'), doc.context.obj(keep));
+    else page.node.delete(PDFName.of('Annots'));
+  }
+  doc.catalog.delete(PDFName.of('AcroForm'));
+}
 $('#btnDownload').addEventListener('click', async () => {
   try {
     setHint('Menyimpan PDF…');
-    const doc = await PDFLib.PDFDocument.load(pdfBytes);
+    let doc = await PDFLib.PDFDocument.load(pdfBytes);
+    try { flattenForm(doc); } catch (e) { doc = await PDFLib.PDFDocument.load(pdfBytes); /* gagal kunci = unduh cara lama */ }
     for (let n = 1; n <= pdfDoc.numPages; n++) {
       const page = doc.getPage(n - 1);
       const ph = page.getHeight();
