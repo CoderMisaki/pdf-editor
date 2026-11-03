@@ -13,6 +13,7 @@ let elements = {};            // { pageNum: [el] } — koordinat dalam poin PDF,
 let detected = {};             // { pageNum: [{x,y,w,h,kind}] } kind: 'box' | 'sig'
 let showDetected = false;
 let selectedId = null, activeSig = null, activeSigAspect = 0.35;
+let sigLocked = false;
 let history = [];
 let redoStack = [];
 let lastSigId = null;
@@ -214,7 +215,7 @@ function renderEl(el, pageNum) {
     d.style.width = el.w * s + 'px'; d.style.height = el.h * s + 'px';
     const img = document.createElement('img'); img.src = el.img; img.draggable = false;
     d.appendChild(img);
-    if (el.id === selectedId) {
+    if (el.id === selectedId && !sigLocked) {
       const h = document.createElement('div'); h.className = 'resize-handle'; h.dataset.resize = el.id;
       d.appendChild(h);
     }
@@ -230,29 +231,20 @@ function pagePoint(overlay, e) {
 }
 function attachOverlay(overlay, pageNum) {
   let drag = null; // {kind, el, dx, dy, startW, startX, startY, moved}
-  overlay.addEventListener('pointerdown', (e) => {
-    if (!pdfDoc) return;
-    const pt = pagePoint(overlay, e);
-    const targetEl = e.target.closest('.el');
-    // Gagang resize berlaku di mode Pilih DAN mode Tanda tangan.
-    if (e.target.dataset.resize) {
-      const el = els(pageNum).find((x) => x.id === e.target.dataset.resize);
-      if (el) { selectedId = el.id; drag = { kind: 'resize', el, startX: e.clientX, startW: el.w, snapshot: JSON.stringify(elements) }; renderOverlays(); }
-      return;
+  let tap = null; // tap menunggu pointerup: kalau jari bergeser = scroll, bukan tap
+  function elAt(pt) {
+    for (const el of els(pageNum)) {
+      if (el.type === 'sig') { if (pt.x >= el.x && pt.x <= el.x + el.w && pt.y >= el.y && pt.y <= el.y + el.h) return el; }
+      else if (el.type === 'text') { if (pt.x >= el.x && pt.x <= el.x + el.text.length * el.size * 0.6 + 20 && pt.y >= el.y && pt.y <= el.y + el.size * 1.4) return el; }
+      else { const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
+        if (pt.x >= Math.min(...xs) - 4 && pt.x <= Math.max(...xs) + 4 && pt.y >= Math.min(...ys) - 4 && pt.y <= Math.max(...ys) + 4) return el; }
     }
-    if (mode === 'select') {
-      if (targetEl) {
-        const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
-        if (el) {
-          selectedId = el.id; renderOverlays();
-          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, snapshot: JSON.stringify(elements) };
-        }
-        return;
-      }
-      selectedId = null; renderOverlays(); return;
-    }
+    return null;
+  }
+  function doTap(pt) {
     if (mode === 'text') {
-      if (targetEl) return; // klik teks yang ada = biarkan mode pilih yang menangani lain kali
+      const hit = elAt(pt);
+      if (hit) { selectedId = hit.id; renderOverlays(); return; }
       pushHistory();
       const el = { id: uid(), type: 'text', page: pageNum, x: pt.x, y: pt.y, text: '', size: +$('#fontInput').value, color: $('#colorInput').value };
       els(pageNum).push(el);
@@ -271,24 +263,17 @@ function attachOverlay(overlay, pageNum) {
       ta.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ta.value = ''; ta.blur(); } });
       return;
     }
-    if (mode === 'pencil') {
-      pushHistory();
-      const el = { id: uid(), type: 'draw', page: pageNum, points: [[pt.x, pt.y]], color: $('#colorInput').value, width: +$('#widthInput').value };
-      els(pageNum).push(el);
-      drag = { kind: 'draw', el, last: pt };
-      overlay.setPointerCapture(e.pointerId);
-      return;
-    }
     if (mode === 'check') {
       pushHistory();
       const box = (detected[pageNum] || []).find((b) => b.kind === 'box' && pt.x >= b.x - 2 && pt.x <= b.x + b.w + 2 && pt.y >= b.y - 2 && pt.y <= b.y + b.h + 2);
       if (box) {
-        const existing = els(pageNum).find((x) => x.type === 'check' && Math.abs(x.x - box.x) < 2 && Math.abs(x.y - box.y) < 2);
+        const existing = els(pageNum).find((x) => x.type === 'check' && x.boxX === box.x && x.boxY === box.y);
         if (existing) elements[pageNum] = els(pageNum).filter((x) => x.id !== existing.id);
         else {
-          const size = Math.min(box.w, box.h);
-          els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: box.x, y: box.y, size, color: $('#colorInput').value,
-            points: [[box.x + size * 0.15, box.y + size * 0.55], [box.x + size * 0.42, box.y + size * 0.82], [box.x + size * 0.88, box.y + size * 0.18]], width: 2.5 });
+          // Centang selalu terpusat di tengah kotak, berapa pun bentuk kotaknya.
+          const size = Math.min(box.w, box.h), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+          els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
+            points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 });
         }
       } else {
         const size = 18;
@@ -299,16 +284,8 @@ function attachOverlay(overlay, pageNum) {
       return;
     }
     if (mode === 'signature') {
+      if (sigLocked) { setHint('Tanda tangan sedang terkunci — matikan kunci di toolbar untuk menempel lagi.'); return; }
       if (!activeSig) { openSigModal(); return; }
-      // Klik tanda tangan yang sudah ada = pilih & geser, bukan menempel baru.
-      if (targetEl) {
-        const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
-        if (el && el.type === 'sig') {
-          selectedId = el.id; renderOverlays();
-          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, snapshot: JSON.stringify(elements) };
-          return;
-        }
-      }
       pushHistory();
       const sigField = (detected[pageNum] || []).find((b) => b.kind === 'sig' && pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h);
       let el;
@@ -323,11 +300,66 @@ function attachOverlay(overlay, pageNum) {
       renderOverlays(); setStatus();
       return;
     }
+  }
+  overlay.addEventListener('pointerdown', (e) => {
+    if (!pdfDoc) return;
+    const pt = pagePoint(overlay, e);
+    const targetEl = e.target.closest('.el');
+    // Gagang resize berlaku di mode Pilih DAN mode Tanda tangan (tidak saat terkunci).
+    if (e.target.dataset.resize) {
+      if (sigLocked) return;
+      const el = els(pageNum).find((x) => x.id === e.target.dataset.resize);
+      if (el) { selectedId = el.id; drag = { kind: 'resize', el, startX: e.clientX, startW: el.w, snapshot: JSON.stringify(elements) }; renderOverlays(); }
+      return;
+    }
+    if (mode === 'select') {
+      if (targetEl) {
+        const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
+        if (el) {
+          selectedId = el.id; renderOverlays();
+          if (el.type === 'sig' && sigLocked) return; // terkunci: boleh dipilih, tidak boleh digeser
+          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
+        }
+        return;
+      }
+      selectedId = null; renderOverlays(); return;
+    }
+    if (mode === 'text' || mode === 'check') {
+      tap = { pt, cx: e.clientX, cy: e.clientY };
+      return;
+    }
+    if (mode === 'pencil') {
+      pushHistory();
+      const el = { id: uid(), type: 'draw', page: pageNum, points: [[pt.x, pt.y]], color: $('#colorInput').value, width: +$('#widthInput').value };
+      els(pageNum).push(el);
+      drag = { kind: 'draw', el, last: pt };
+      overlay.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (mode === 'signature') {
+      // Klik tanda tangan yang sudah ada = pilih & geser, bukan menempel baru.
+      if (targetEl) {
+        const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
+        if (el && el.type === 'sig') {
+          selectedId = el.id; renderOverlays();
+          if (sigLocked) return;
+          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
+          return;
+        }
+      }
+      tap = { pt, cx: e.clientX, cy: e.clientY };
+      return;
+    }
   });
   overlay.addEventListener('pointermove', (e) => {
+    if (tap && Math.hypot(e.clientX - tap.cx, e.clientY - tap.cy) > 12) tap = null; // jari bergeser = scroll, batalkan tap
     if (!drag) return;
     const pt = pagePoint(overlay, e);
     if (drag.kind === 'move') {
+      if (drag.pending) {
+        if (Math.hypot(e.clientX - drag.startCX, e.clientY - drag.startCY) < 8) return; // belum benar-benar digeser
+        drag.pending = false;
+      }
       drag.el.x = pt.x - drag.dx; drag.el.y = pt.y - drag.dy; drag.moved = true;
       const div = overlay.querySelector(`[data-id="${drag.el.id}"]`);
       if (div) { div.style.left = drag.el.x * zoom + 'px'; div.style.top = drag.el.y * zoom + 'px'; }
@@ -353,8 +385,11 @@ function attachOverlay(overlay, pageNum) {
     if (drag && drag.kind !== 'draw') renderOverlays();
     drag = null;
   };
-  overlay.addEventListener('pointerup', endDrag);
-  overlay.addEventListener('pointercancel', endDrag);
+  overlay.addEventListener('pointerup', () => {
+    if (tap) { const t = tap; tap = null; doTap(t.pt); }
+    endDrag();
+  });
+  overlay.addEventListener('pointercancel', () => { tap = null; endDrag(); });
 }
 
 /* ---------- Modal tanda tangan ---------- */
@@ -362,6 +397,12 @@ const sigModal = $('#sigModal'), sigCanvas = $('#sigCanvas'), sigCtx = sigCanvas
 let sigDrawing = false, sigTouched = false;
 function openSigModal() { sigModal.classList.remove('hidden'); }
 $('#btnSigPad').addEventListener('click', openSigModal);
+$('#btnSigLock').addEventListener('click', () => {
+  sigLocked = !sigLocked;
+  $('#btnSigLock').textContent = sigLocked ? '🔒 Tanda tangan terkunci' : '🔓 Tanda tangan tidak terkunci';
+  setHint(sigLocked ? 'Tanda tangan TERKUNCI: geser/scroll halaman tidak akan menambah atau menggeser tanda tangan. Matikan kunci untuk menempel lagi.' : 'Kunci tanda tangan dimatikan: mode Tanda tangan bisa menempel lagi.');
+  renderOverlays();
+});
 $('#btnSigClose').addEventListener('click', () => sigModal.classList.add('hidden'));
 $('#btnSigClear').addEventListener('click', () => { sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); sigTouched = false; });
 function sigPos(e) {

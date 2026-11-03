@@ -27,7 +27,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .overlay { position: absolute; inset: 0; line-height: normal; }
 .overlay.select-mode { cursor: default; }
 .overlay.text-mode { cursor: text; }
-.overlay.pencil-mode { cursor: crosshair; }
+.overlay.pencil-mode { cursor: crosshair; touch-action: none; }
 .overlay.signature-mode, .overlay.check-mode { cursor: pointer; }
 .el { position: absolute; }
 .el.selected { outline: 2px solid #2563eb; outline-offset: 1px; }

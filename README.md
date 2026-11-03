@@ -12,14 +12,23 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   Tempel di halaman, tanda tangan langsung terpilih sehingga **slider
   ukuran di toolbar langsung membesarkan/mengecilkan**; juga bisa
   **seret untuk memindah** dan **tarik gagang biru untuk mengubah ukuran**,
-  baik di mode Tanda tangan maupun mode Pilih.
+  baik di mode Tanda tangan maupun mode Pilih. Penempelan juga hanya
+  terjadi pada ketukan murni (bukan saat scroll), jadi geser layar tidak
+  menambah tanda tangan liar.
+- **Kunci tanda tangan** — tombol 🔒 di toolbar. Saat terkunci, scroll
+  dan ketukan tidak akan menambah, memindah, atau mengubah ukuran tanda
+  tangan (tanda tangan yang sudah ada tetap tampil dan ikut ke-scroll
+  bersama halaman, tidak tertutup elemen lain). Matikan kunci untuk
+  menempel/mengedit lagi.
 - **Deteksi kotak & field** — tombol *Deteksi kotak & field* akan mencari:
   1. field formulir asli di PDF (kotak ceklis dan kolom tanda tangan), dan
   2. kotak kosong bergaris di halaman (untuk formulir hasil cetak/flatten).
   Kotak terdeteksi ditandai garis putus-putus oranye, kolom tanda tangan ungu.
 - **Ceklis otomatis** — di mode Ceklis, ketuk kotak kosong yang terdeteksi
-  dan tanda centang langsung muncul pas di dalam kotaknya. Ketuk lagi untuk
-  membatalkan. Ketuk di luar kotak untuk menaruh centang bebas.
+  dan tanda centang langsung muncul pas di tengah kotaknya, berapa pun
+  bentuk kotaknya. Ketuk lagi untuk membatalkan. Ketuk di luar kotak untuk
+  menaruh centang bebas. Ketuk hanya dihitung bila jari tidak bergeser
+  (geser = scroll, bukan ketuk), jadi scroll tidak sengaja menambah centang.
 - **Pilih / geser / hapus / urungkan / ulangi** — klik elemen untuk
   memilih, seret untuk memindah, tombol Delete untuk menghapus, tombol
   Urungkan untuk membatalkan langkah terakhir, tombol Ulangi untuk
