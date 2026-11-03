@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDF Editor Gratis — Teks, Pensil, Tanda Tangan & Ceklis</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=1.3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
@@ -29,6 +29,7 @@
     <button class="mode" data-mode="pencil">✏ Pensil</button>
     <button class="mode" data-mode="signature">✍ Tanda tangan</button>
     <button class="mode" data-mode="check">☑ Ceklis</button>
+    <button class="btn small" id="btnSigLock" title="Kunci tanda tangan">🔓 Kunci</button>
   </div>
   <div class="opts">
     <label>Warna <input type="color" id="colorInput" value="#000000"></label>
@@ -36,7 +37,6 @@
     <label>Ukuran teks <input type="range" id="fontInput" min="10" max="36" value="16"> <span id="fontVal">16</span></label>
     <label>Uk. tanda tangan <input type="range" id="sigSizeInput" min="60" max="300" value="150"> <span id="sigSizeVal">150</span>pt</label>
     <button class="btn small" id="btnSigPad">Buat / unggah tanda tangan</button>
-    <button class="btn small" id="btnSigLock">🔓 Tanda tangan tidak terkunci</button>
     <button class="btn small danger" id="btnDelete" disabled>Hapus yang dipilih</button>
   </div>
 </div>
@@ -77,6 +77,6 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=1.3"></script>
 </body>
 </html>

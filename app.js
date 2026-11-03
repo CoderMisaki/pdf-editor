@@ -57,7 +57,7 @@ document.querySelectorAll('.mode').forEach((b) => {
       mode === 'text' ? 'Mode Teks: klik di halaman, ketik, lalu klik di luar kotak untuk menyimpan.' :
       mode === 'pencil' ? 'Mode Pensil: seret di halaman untuk menggambar bebas (mis. mencentang manual).' :
       mode === 'signature' ? 'Mode Tanda tangan: klik di halaman untuk menempel tanda tangan. Seret untuk memindah, tarik gagang biru untuk mengubah ukuran.' :
-      mode === 'check' ? 'Mode Ceklis: ketuk kotak kosong yang terdeteksi (garis putus-putus oranye) untuk ceklis otomatis. Ketuk lagi untuk membatalkan.' :
+      mode === 'check' ? 'Mode Ceklis: HANYA ketukan tepat di kotak oranye yang terdeteksi yang menambah centang (ketuk lagi untuk membatalkan). Ketukan di luar kotak tidak menambah apa-apa.' :
       'Mode Pilih: klik elemen untuk memilih, seret untuk memindah, tombol Delete untuk menghapus.'
     );
   });
@@ -264,21 +264,19 @@ function attachOverlay(overlay, pageNum) {
       return;
     }
     if (mode === 'check') {
-      pushHistory();
+      // Aturan baru: HANYA ketukan tepat di kotak terdeteksi yang menambah
+      // centang. Ketukan di luar kotak tidak menambah apa-apa, jadi scroll
+      // tidak mungkin lagi menabur centang liar di halaman.
       const box = (detected[pageNum] || []).find((b) => b.kind === 'box' && pt.x >= b.x - 2 && pt.x <= b.x + b.w + 2 && pt.y >= b.y - 2 && pt.y <= b.y + b.h + 2);
-      if (box) {
-        const existing = els(pageNum).find((x) => x.type === 'check' && x.boxX === box.x && x.boxY === box.y);
-        if (existing) elements[pageNum] = els(pageNum).filter((x) => x.id !== existing.id);
-        else {
-          // Centang selalu terpusat di tengah kotak, berapa pun bentuk kotaknya.
-          const size = Math.min(box.w, box.h), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-          els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
-            points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 });
-        }
-      } else {
-        const size = 18;
-        els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: pt.x - size / 2, y: pt.y - size / 2, size, color: $('#colorInput').value,
-          points: [[pt.x - size * 0.35, pt.y + size * 0.05], [pt.x - size * 0.08, pt.y + size * 0.32], [pt.x + size * 0.38, pt.y - size * 0.32]], width: 2.5 });
+      if (!box) { setHint('Bukan kotak: ketuk tepat di kotak oranye yang terdeteksi untuk ceklis.'); return; }
+      pushHistory();
+      const existing = els(pageNum).find((x) => x.type === 'check' && x.boxX === box.x && x.boxY === box.y);
+      if (existing) elements[pageNum] = els(pageNum).filter((x) => x.id !== existing.id);
+      else {
+        // Centang selalu terpusat di tengah kotak, berapa pun bentuk kotaknya.
+        const size = Math.min(box.w, box.h), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+        els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
+          points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 });
       }
       renderOverlays(); setStatus();
       return;
@@ -333,6 +331,7 @@ function attachOverlay(overlay, pageNum) {
       const el = { id: uid(), type: 'draw', page: pageNum, points: [[pt.x, pt.y]], color: $('#colorInput').value, width: +$('#widthInput').value };
       els(pageNum).push(el);
       drag = { kind: 'draw', el, last: pt };
+      renderOverlays(); // gambar div coretan sekali, lalu gerakannya di-update di tempat
       overlay.setPointerCapture(e.pointerId);
       return;
     }
@@ -370,7 +369,21 @@ function attachOverlay(overlay, pageNum) {
       if (div) { div.style.width = nw * zoom + 'px'; div.style.height = drag.el.h * zoom + 'px'; }
     } else if (drag.kind === 'draw') {
       const last = drag.last;
-      if (Math.hypot(pt.x - last.x, pt.y - last.y) > 0.5) { drag.el.points.push([pt.x, pt.y]); drag.last = pt; renderOverlays(); }
+      if (Math.hypot(pt.x - last.x, pt.y - last.y) > 0.5) {
+        drag.el.points.push([pt.x, pt.y]); drag.last = pt;
+        // Update coretan di tempat (tanpa membangun ulang semua overlay):
+        // membangun ulang tiap gerakan bikin goresan patah-patah di HP.
+        const el = drag.el;
+        const div = overlay.querySelector(`[data-id="${el.id}"]`);
+        if (div) {
+          const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
+          const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys);
+          div.style.left = minX * zoom + 'px'; div.style.top = minY * zoom + 'px';
+          div.style.width = Math.max(maxX - minX, 4) * zoom + 'px'; div.style.height = Math.max(maxY - minY, 4) * zoom + 'px';
+          const pl = div.querySelector('polyline');
+          if (pl) pl.setAttribute('points', el.points.map((p) => `${(p[0] - minX) * zoom},${(p[1] - minY) * zoom}`).join(' '));
+        }
+      }
     }
   });
   const endDrag = () => {
@@ -399,7 +412,7 @@ function openSigModal() { sigModal.classList.remove('hidden'); }
 $('#btnSigPad').addEventListener('click', openSigModal);
 $('#btnSigLock').addEventListener('click', () => {
   sigLocked = !sigLocked;
-  $('#btnSigLock').textContent = sigLocked ? '🔒 Tanda tangan terkunci' : '🔓 Tanda tangan tidak terkunci';
+  $('#btnSigLock').textContent = sigLocked ? '🔒 Terkunci' : '🔓 Kunci';
   setHint(sigLocked ? 'Tanda tangan TERKUNCI: geser/scroll halaman tidak akan menambah atau menggeser tanda tangan. Matikan kunci untuk menempel lagi.' : 'Kunci tanda tangan dimatikan: mode Tanda tangan bisa menempel lagi.');
   renderOverlays();
 });
