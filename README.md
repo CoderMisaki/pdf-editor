@@ -28,6 +28,13 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   menggerakkan centang terpilih/terakhir dibuat — tidak perlu
   memilih dulu. Di mode Ceklis, seret centang yang ada juga bisa
   memindahkannya (lepas tanpa geser = batalkan centang).
+- **Ukuran presisi** — slider **Uk. tanda tangan** (60–300pt, tombol
+  −/+ melompat 10pt) dan slider **Uk. ceklis** (6–40pt, tombol −/+
+  1pt) di toolbar. Keduanya mengubah elemen terpilih/terakhir
+  (tanda tangan menjaga proporsi, centang tetap terpusat di titik
+  tengahnya), dan slider ceklis otomatis mengikuti ukuran centang
+  yang dibuat/dipilih. Tidak ada lagi outline biru penanda terpilih
+  di halaman — tampilan bersih saat menggeser/mengubah ukuran.
 - **Zoom cubit dua jari** — di HP, cubit/mekarkan dua jari di atas halaman
   untuk zoom in/out; zoom mengarah ke titik tengah cubitan (bukan ke tengah
   halaman), jadi bisa menargetkan area yang ingin diperbesar. Tombol
