@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Editor Gratis — Teks, Pensil, Tanda Tangan & Ceklis</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📄 PDF Editor <span class="free">Gratis</span></div>
+  <div class="actions">
+    <label class="btn primary">Buka PDF
+      <input type="file" id="fileInput" accept="application/pdf" hidden>
+    </label>
+    <button class="btn" id="btnDetect" disabled>Deteksi kotak &amp; field</button>
+    <button class="btn" id="btnUndo" disabled>Urungkan</button>
+    <button class="btn primary" id="btnDownload" disabled>Unduh PDF</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="modes" role="group" aria-label="Alat">
+    <button class="mode active" data-mode="select">↖ Pilih / Geser</button>
+    <button class="mode" data-mode="text">T Teks</button>
+    <button class="mode" data-mode="pencil">✏ Pensil</button>
+    <button class="mode" data-mode="signature">✍ Tanda tangan</button>
+    <button class="mode" data-mode="check">☑ Ceklis</button>
+  </div>
+  <div class="opts">
+    <label>Warna <input type="color" id="colorInput" value="#000000"></label>
+    <label>Garis <input type="range" id="widthInput" min="1" max="8" value="2"> <span id="widthVal">2</span>px</label>
+    <label>Ukuran teks <input type="range" id="fontInput" min="10" max="36" value="16"> <span id="fontVal">16</span></label>
+    <label>Uk. tanda tangan <input type="range" id="sigSizeInput" min="60" max="300" value="150"> <span id="sigSizeVal">150</span>pt</label>
+    <button class="btn small" id="btnSigPad">Buat / unggah tanda tangan</button>
+    <button class="btn small danger" id="btnDelete" disabled>Hapus yang dipilih</button>
+  </div>
+</div>
+
+<div class="hint" id="hint">Buka file PDF dulu, atau seret PDF ke halaman ini. Semua proses berjalan lokal di browser, file tidak diunggah ke server mana pun.</div>
+
+<main id="viewer">
+  <div id="dropzone">
+    <p class="big">Seret PDF ke sini</p>
+    <p>atau klik <b>Buka PDF</b> di atas</p>
+    <p class="small">Fitur: tambah teks • coret/gambar bebas dengan pensil • tanda tangan (bisa dibesarkan/dikecilkan) • deteksi kotak ceklis &amp; kolom tanda tangan, ketuk kotaknya langsung terceklist • unduh hasil sebagai PDF baru.</p>
+  </div>
+  <div id="pages"></div>
+</main>
+
+<div class="zoombar">
+  <button id="zoomOut">−</button>
+  <span id="zoomVal">100%</span>
+  <button id="zoomIn">+</button>
+  <span id="status"></span>
+</div>
+
+<!-- Modal tanda tangan -->
+<div class="modal hidden" id="sigModal">
+  <div class="modal-box">
+    <h2>Tanda tangan</h2>
+    <p>Gambar tanda tangan di bawah ini (mouse / sentuhan), atau unggah gambar tanda tangan.</p>
+    <canvas id="sigCanvas" width="480" height="180"></canvas>
+    <div class="row">
+      <button class="btn" id="btnSigClear">Hapus gambar</button>
+      <label class="btn">Unggah gambar <input type="file" id="sigFileInput" accept="image/*" hidden></label>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="btnSigUse">Pakai tanda tangan ini</button>
+      <button class="btn" id="btnSigClose">Tutup</button>
+    </div>
+    <p class="small" id="sigPreviewWrap" hidden>Pratinjau aktif: <img id="sigPreview" alt="pratinjau tanda tangan"></p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
