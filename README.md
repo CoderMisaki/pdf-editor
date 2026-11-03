@@ -9,8 +9,10 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
 - **Pensil** — gambar bebas di halaman (coretan, lingkaran, tanda tangan
   coret, dll.), atur warna dan ketebalan garis.
 - **Tanda tangan** — gambar di kanvas, atau unggah gambar tanda tangan.
-  Tempel di halaman, lalu **seret untuk memindah** dan **tarik gagang biru
-  untuk membesarkan/mengecilkan**. Ada juga slider ukuran di toolbar.
+  Tempel di halaman, tanda tangan langsung terpilih sehingga **slider
+  ukuran di toolbar langsung membesarkan/mengecilkan**; juga bisa
+  **seret untuk memindah** dan **tarik gagang biru untuk mengubah ukuran**,
+  baik di mode Tanda tangan maupun mode Pilih.
 - **Deteksi kotak & field** — tombol *Deteksi kotak & field* akan mencari:
   1. field formulir asli di PDF (kotak ceklis dan kolom tanda tangan), dan
   2. kotak kosong bergaris di halaman (untuk formulir hasil cetak/flatten).
@@ -18,9 +20,11 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
 - **Ceklis otomatis** — di mode Ceklis, ketuk kotak kosong yang terdeteksi
   dan tanda centang langsung muncul pas di dalam kotaknya. Ketuk lagi untuk
   membatalkan. Ketuk di luar kotak untuk menaruh centang bebas.
-- **Pilih / geser / hapus / urungkan** — klik elemen untuk memilih, seret
-  untuk memindah, tombol Delete untuk menghapus, tombol Urungkan untuk
-  membatalkan langkah terakhir.
+- **Pilih / geser / hapus / urungkan / ulangi** — klik elemen untuk
+  memilih, seret untuk memindah, tombol Delete untuk menghapus, tombol
+  Urungkan untuk membatalkan langkah terakhir, tombol Ulangi untuk
+  mengembalikan langkah yang diurungkan (juga lewat `Ctrl+Y` atau
+  `Ctrl+Shift+Z`; `Ctrl+Z` untuk urungkan).
 - **Unduh PDF** — hasil edit disimpan sebagai file PDF baru
   (`namafile-edited.pdf`), elemen menempel permanen di halaman.
 

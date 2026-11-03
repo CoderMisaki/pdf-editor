@@ -14,6 +14,8 @@ let detected = {};             // { pageNum: [{x,y,w,h,kind}] } kind: 'box' | 's
 let showDetected = false;
 let selectedId = null, activeSig = null, activeSigAspect = 0.35;
 let history = [];
+let redoStack = [];
+let lastSigId = null;
 let pageInfo = {};             // { pageNum: {widthPt, heightPt} }
 
 const uid = () => 'el' + Math.random().toString(36).slice(2, 9);
@@ -23,10 +25,15 @@ const setStatus = () => {
   const n = Object.values(elements).reduce((a, b) => a + b.length, 0);
   statusEl.textContent = pdfDoc ? `${pdfDoc.numPages} halaman • ${n} elemen` : '';
 };
+function updateUndoRedo() {
+  $('#btnUndo').disabled = history.length === 0;
+  $('#btnRedo').disabled = redoStack.length === 0;
+}
 function pushHistory() {
   history.push(JSON.stringify(elements));
   if (history.length > 50) history.shift();
-  $('#btnUndo').disabled = history.length === 0;
+  redoStack = []; // langkah baru membatalkan jalur redo
+  updateUndoRedo();
 }
 function hexRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -58,18 +65,36 @@ $('#widthInput').addEventListener('input', (e) => { $('#widthVal').textContent =
 $('#fontInput').addEventListener('input', (e) => { $('#fontVal').textContent = e.target.value; });
 $('#sigSizeInput').addEventListener('input', (e) => {
   $('#sigSizeVal').textContent = e.target.value;
-  const el = findSelected();
+  // Slider harus selalu punya target: tanda tangan terpilih, atau kalau tidak
+  // ada yang terpilih, tanda tangan yang terakhir ditempel.
+  let el = findSelected();
+  if ((!el || el.type !== 'sig') && lastSigId) {
+    for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastSigId); if (f) { el = f; selectedId = f.id; break; } }
+  }
   if (el && el.type === 'sig') { pushHistory(); el.w = +e.target.value; el.h = el.w * el.aspect; renderOverlays(); }
 });
-$('#btnUndo').addEventListener('click', () => {
+function doUndo() {
   if (!history.length) return;
+  redoStack.push(JSON.stringify(elements));
   elements = JSON.parse(history.pop());
-  $('#btnUndo').disabled = history.length === 0;
-  selectedId = null; renderOverlays(); setStatus();
-});
+  selectedId = null; renderOverlays(); setStatus(); updateUndoRedo();
+}
+function doRedo() {
+  if (!redoStack.length) return;
+  history.push(JSON.stringify(elements));
+  if (history.length > 50) history.shift();
+  elements = JSON.parse(redoStack.pop());
+  selectedId = null; renderOverlays(); setStatus(); updateUndoRedo();
+}
+$('#btnUndo').addEventListener('click', doUndo);
+$('#btnRedo').addEventListener('click', doRedo);
 $('#btnDelete').addEventListener('click', deleteSelected);
 document.addEventListener('keydown', (e) => {
-  if ((e.key === 'Delete' || e.key === 'Backspace') && !/TEXTAREA|INPUT/.test(document.activeElement.tagName)) deleteSelected();
+  const typing = /TEXTAREA|INPUT/.test(document.activeElement.tagName);
+  if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); }
+  else if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); doRedo(); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
 });
 function findSelected() {
   for (const p of Object.values(elements)) for (const el of p) if (el.id === selectedId) return el;
@@ -101,7 +126,7 @@ async function loadPdfFile(file) {
     pdfBytes = buf.slice(0);
     fileName = file.name.replace(/\.pdf$/i, '');
     pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
-    elements = {}; detected = {}; history = []; selectedId = null;
+    elements = {}; detected = {}; history = []; redoStack = []; selectedId = null; lastSigId = null; updateUndoRedo();
     dropzone.style.display = 'none';
     $('#btnDetect').disabled = false; $('#btnDownload').disabled = false;
     setHint('PDF dimuat. Pilih alat di atas, lalu kerjakan langsung di halaman.');
@@ -209,18 +234,18 @@ function attachOverlay(overlay, pageNum) {
     if (!pdfDoc) return;
     const pt = pagePoint(overlay, e);
     const targetEl = e.target.closest('.el');
+    // Gagang resize berlaku di mode Pilih DAN mode Tanda tangan.
+    if (e.target.dataset.resize) {
+      const el = els(pageNum).find((x) => x.id === e.target.dataset.resize);
+      if (el) { selectedId = el.id; drag = { kind: 'resize', el, startX: e.clientX, startW: el.w, snapshot: JSON.stringify(elements) }; renderOverlays(); }
+      return;
+    }
     if (mode === 'select') {
-      if (e.target.dataset.resize) {
-        const el = els(pageNum).find((x) => x.id === e.target.dataset.resize);
-        if (el) { pushHistory(); drag = { kind: 'resize', el, startX: e.clientX, startW: el.w }; }
-        return;
-      }
       if (targetEl) {
         const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
         if (el) {
           selectedId = el.id; renderOverlays();
-          pushHistory();
-          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false };
+          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, snapshot: JSON.stringify(elements) };
         }
         return;
       }
@@ -275,14 +300,26 @@ function attachOverlay(overlay, pageNum) {
     }
     if (mode === 'signature') {
       if (!activeSig) { openSigModal(); return; }
+      // Klik tanda tangan yang sudah ada = pilih & geser, bukan menempel baru.
+      if (targetEl) {
+        const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
+        if (el && el.type === 'sig') {
+          selectedId = el.id; renderOverlays();
+          drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, snapshot: JSON.stringify(elements) };
+          return;
+        }
+      }
       pushHistory();
       const sigField = (detected[pageNum] || []).find((b) => b.kind === 'sig' && pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h);
+      let el;
       if (sigField) {
-        els(pageNum).push({ id: uid(), type: 'sig', page: pageNum, img: activeSig, x: sigField.x, y: sigField.y, w: sigField.w, h: sigField.h, aspect: sigField.h / sigField.w });
+        el = { id: uid(), type: 'sig', page: pageNum, img: activeSig, x: sigField.x, y: sigField.y, w: sigField.w, h: sigField.h, aspect: sigField.h / sigField.w };
       } else {
         const w = +$('#sigSizeInput').value, h = w * activeSigAspect;
-        els(pageNum).push({ id: uid(), type: 'sig', page: pageNum, img: activeSig, x: pt.x - w / 2, y: pt.y - h / 2, w, h, aspect: activeSigAspect });
+        el = { id: uid(), type: 'sig', page: pageNum, img: activeSig, x: pt.x - w / 2, y: pt.y - h / 2, w, h, aspect: activeSigAspect };
       }
+      els(pageNum).push(el);
+      selectedId = el.id; lastSigId = el.id; // langsung terpilih: slider & gagang langsung bekerja
       renderOverlays(); setStatus();
       return;
     }
@@ -304,7 +341,18 @@ function attachOverlay(overlay, pageNum) {
       if (Math.hypot(pt.x - last.x, pt.y - last.y) > 0.5) { drag.el.points.push([pt.x, pt.y]); drag.last = pt; renderOverlays(); }
     }
   });
-  const endDrag = () => { if (drag && drag.kind !== 'draw') renderOverlays(); drag = null; };
+  const endDrag = () => {
+    if (drag && drag.snapshot) {
+      const changed = drag.kind === 'resize' ? drag.el.w !== drag.startW : drag.moved;
+      if (changed) {
+        history.push(drag.snapshot);
+        if (history.length > 50) history.shift();
+        redoStack = []; updateUndoRedo();
+      }
+    }
+    if (drag && drag.kind !== 'draw') renderOverlays();
+    drag = null;
+  };
   overlay.addEventListener('pointerup', endDrag);
   overlay.addEventListener('pointercancel', endDrag);
 }
