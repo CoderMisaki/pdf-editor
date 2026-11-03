@@ -14,6 +14,8 @@ let detected = {};             // { pageNum: [{x,y,w,h,kind}] } kind: 'box' | 's
 let showDetected = false;
 let selectedId = null, activeSig = null, activeSigAspect = 0.35;
 let sigLocked = false;
+let pinchState = null; // {startDist, startZoom, lastZoom, center} saat cubit dua jari
+const gestureCancels = []; // diisi tiap attachOverlay, dikosongkan tiap renderPages
 let history = [];
 let redoStack = [];
 let lastSigId = null;
@@ -57,7 +59,7 @@ document.querySelectorAll('.mode').forEach((b) => {
       mode === 'text' ? 'Mode Teks: klik di halaman, ketik, lalu klik di luar kotak untuk menyimpan.' :
       mode === 'pencil' ? 'Mode Pensil: seret di halaman untuk menggambar bebas (mis. mencentang manual).' :
       mode === 'signature' ? 'Mode Tanda tangan: klik di halaman untuk menempel tanda tangan. Seret untuk memindah, tarik gagang biru untuk mengubah ukuran.' :
-      mode === 'check' ? 'Mode Ceklis: ketuk di kotak oranye (atau dekat kotaknya) — centang otomatis menempel pas di tengah kotak. Ketuk lagi untuk membatalkan. Ketukan jauh dari kotak tidak menambah apa-apa.' :
+      mode === 'check' ? 'Mode Ceklis: ketuk di kotak oranye (atau dekat kotaknya) — centang otomatis menempel pas di tengah kotak. Ketuk lagi untuk membatalkan. Seret centang yang ada untuk memindahkannya. Ketukan jauh dari kotak tidak menambah apa-apa.' :
       'Mode Pilih: klik elemen untuk memilih, seret untuk memindah, tombol Delete untuk menghapus.'
     );
   });
@@ -139,6 +141,7 @@ async function loadPdfFile(file) {
 
 /* ---------- Render halaman ---------- */
 async function renderPages() {
+  gestureCancels.length = 0;
   pagesEl.innerHTML = ''; pageInfo = {};
   for (let n = 1; n <= pdfDoc.numPages; n++) {
     const page = await pdfDoc.getPage(n);
@@ -234,6 +237,13 @@ function pagePoint(overlay, e) {
 function attachOverlay(overlay, pageNum) {
   let drag = null; // {kind, el, dx, dy, startW, startX, startY, moved}
   let tap = null; // tap menunggu pointerup: kalau jari bergeser = scroll, bukan tap
+  function normXY(el) {
+    if (el.x === undefined || el.y === undefined) {
+      const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
+      el.x = Math.min(...xs); el.y = Math.min(...ys);
+    }
+  }
+  gestureCancels.push(() => { tap = null; endDrag(); });
   function elAt(pt) {
     for (const el of els(pageNum)) {
       if (el.type === 'sig') { if (pt.x >= el.x && pt.x <= el.x + el.w && pt.y >= el.y && pt.y <= el.y + el.h) return el; }
@@ -306,7 +316,7 @@ function attachOverlay(overlay, pageNum) {
     }
   }
   overlay.addEventListener('pointerdown', (e) => {
-    if (!pdfDoc) return;
+    if (!pdfDoc || pinchState) return;
     const pt = pagePoint(overlay, e);
     const targetEl = e.target.closest('.el');
     // Gagang resize berlaku di mode Pilih DAN mode Tanda tangan (tidak saat terkunci).
@@ -326,12 +336,26 @@ function attachOverlay(overlay, pageNum) {
         if (el) {
           selectedId = el.id; renderOverlays();
           if (sigLocked) return; // terkunci: boleh dipilih, tidak boleh digeser
+          normXY(el);
           drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
           overlay.style.touchAction = 'none'; // cegah browser merebut gestur jadi scroll
         }
         return;
       }
       selectedId = null; renderOverlays(); return;
+    }
+    // Mode Ceklis: seret centang yang ada = pindah (seperti tanda tangan);
+    // lepas tanpa geser = toggle (ditangani doTap lewat tap yang dicatat).
+    if (mode === 'check' && targetEl) {
+      const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
+      if (el && el.type === 'check') {
+        selectedId = el.id; renderOverlays();
+        normXY(el);
+        drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
+        overlay.style.touchAction = 'none';
+        tap = { pt, cx: e.clientX, cy: e.clientY };
+        return;
+      }
     }
     if (mode === 'text' || mode === 'check') {
       tap = { pt, cx: e.clientX, cy: e.clientY };
@@ -353,6 +377,7 @@ function attachOverlay(overlay, pageNum) {
         if (el && el.type === 'sig') {
           selectedId = el.id; renderOverlays();
           if (sigLocked) return;
+          normXY(el);
           drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
           overlay.style.touchAction = 'none'; // cegah browser merebut gestur jadi scroll
           return;
@@ -363,6 +388,7 @@ function attachOverlay(overlay, pageNum) {
     }
   });
   overlay.addEventListener('pointermove', (e) => {
+    if (pinchState) return;
     if (tap && Math.hypot(e.clientX - tap.cx, e.clientY - tap.cy) > 12) tap = null; // jari bergeser = scroll, batalkan tap
     if (!drag) return;
     const pt = pagePoint(overlay, e);
@@ -370,9 +396,17 @@ function attachOverlay(overlay, pageNum) {
       if (drag.pending) {
         if (Math.hypot(e.clientX - drag.startCX, e.clientY - drag.startCY) < 8) return; // belum benar-benar digeser
         drag.pending = false;
+        tap = null; // sudah jadi geseran, bukan ketukan (jangan ikut toggle)
         try { overlay.setPointerCapture(e.pointerId); } catch (_) {}
       }
-      drag.el.x = pt.x - drag.dx; drag.el.y = pt.y - drag.dy; drag.moved = true;
+      const newX = pt.x - drag.dx, newY = pt.y - drag.dy;
+      if (drag.el.type === 'check' || drag.el.type === 'draw') {
+        // Posisi ceklis/coretan disimpan di points (absolut), bukan x/y —
+        // geser points-nya, kalau tidak, render akan mengembalikannya.
+        const ddx = newX - drag.el.x, ddy = newY - drag.el.y;
+        drag.el.points = drag.el.points.map((p) => [p[0] + ddx, p[1] + ddy]);
+      }
+      drag.el.x = newX; drag.el.y = newY; drag.moved = true;
       const div = overlay.querySelector(`[data-id="${drag.el.id}"]`);
       if (div) { div.style.left = drag.el.x * zoom + 'px'; div.style.top = drag.el.y * zoom + 'px'; }
     } else if (drag.kind === 'resize') {
@@ -413,6 +447,7 @@ function attachOverlay(overlay, pageNum) {
     drag = null;
   };
   overlay.addEventListener('pointerup', () => {
+    if (pinchState) return;
     if (tap) { const t = tap; tap = null; doTap(t.pt); }
     endDrag();
   });
@@ -430,19 +465,24 @@ $('#btnSigLock').addEventListener('click', () => {
   setHint(sigLocked ? 'TERKUNCI: semua edit dimatikan (teks, pensil, ceklis, tanda tangan, geser, ubah ukuran). Scroll tetap bisa. Buka kunci untuk mengedit lagi.' : 'Kunci dibuka: semua alat bisa dipakai lagi.');
   renderOverlays();
 });
-function nudgeSig(dx, dy) {
-  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk menggeser tanda tangan.'); return; }
+function nudgeEl(dx, dy) {
+  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk menggeser.'); return; }
   let el = findSelected();
-  if ((!el || el.type !== 'sig') && lastSigId) {
+  if (!el && lastSigId) {
     for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastSigId); if (f) { el = f; selectedId = f.id; break; } }
   }
-  if (!el || el.type !== 'sig') { setHint('Pilih tanda tangan dulu (mode Pilih, ketuk tanda tangannya), lalu pakai tombol arah.'); return; }
-  pushHistory(); el.x += dx; el.y += dy; renderOverlays(); setStatus();
+  if (!el) { setHint('Pilih elemen dulu (mode Pilih, ketuk elemennya), lalu pakai tombol arah.'); return; }
+  pushHistory();
+  if (el.type === 'check' || el.type === 'draw') {
+    if (el.x === undefined) { const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]); el.x = Math.min(...xs); el.y = Math.min(...ys); }
+    el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
+  }
+  el.x += dx; el.y += dy; renderOverlays(); setStatus();
 }
-$('#btnNudgeLeft').addEventListener('click', () => nudgeSig(-6, 0));
-$('#btnNudgeRight').addEventListener('click', () => nudgeSig(6, 0));
-$('#btnNudgeUp').addEventListener('click', () => nudgeSig(0, -6));
-$('#btnNudgeDown').addEventListener('click', () => nudgeSig(0, 6));
+$('#btnNudgeLeft').addEventListener('click', () => nudgeEl(-6, 0));
+$('#btnNudgeRight').addEventListener('click', () => nudgeEl(6, 0));
+$('#btnNudgeUp').addEventListener('click', () => nudgeEl(0, -6));
+$('#btnNudgeDown').addEventListener('click', () => nudgeEl(0, 6));
 $('#btnSigClose').addEventListener('click', () => sigModal.classList.add('hidden'));
 $('#btnSigClear').addEventListener('click', () => { sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); sigTouched = false; });
 function sigPos(e) {
@@ -486,13 +526,83 @@ function setActiveSig(dataUrl) {
 }
 
 /* ---------- Zoom ---------- */
-function setZoom(z) {
-  zoom = Math.min(3, Math.max(0.5, z));
+let zoomRendering = false, pendingZoom = null;
+async function applyZoom(z, anchor) {
+  const target = Math.min(3, Math.max(0.5, z));
+  if (!pdfDoc) { zoom = target; $('#zoomVal').textContent = Math.round(zoom * 100) + '%'; return; }
+  if (zoomRendering) { pendingZoom = { z: target, anchor }; return; }
+  zoomRendering = true;
+  // Jangkar: titik PDF yang sedang di bawah jari, supaya setelah zoom
+  // titik itu tetap di bawah jari (zoom mengarah ke jari, bukan ke tengah).
+  let anchorPt = null, anchorPage = null;
+  if (anchor) {
+    const wraps = [...document.querySelectorAll('#pages .page')];
+    let wrap = wraps.find((w) => { const r = w.getBoundingClientRect(); return anchor.x >= r.left && anchor.x <= r.right && anchor.y >= r.top && anchor.y <= r.bottom; });
+    if (!wrap && wraps.length) wrap = wraps.reduce((a, b) => Math.abs(b.getBoundingClientRect().top - anchor.y) < Math.abs(a.getBoundingClientRect().top - anchor.y) ? b : a);
+    if (wrap) {
+      const r = wrap.getBoundingClientRect();
+      anchorPage = +wrap.dataset.page;
+      anchorPt = { x: (anchor.x - r.left) / zoom, y: (anchor.y - r.top) / zoom };
+    }
+  }
+  zoom = target;
   $('#zoomVal').textContent = Math.round(zoom * 100) + '%';
-  if (pdfDoc) renderPages();
+  await renderPages();
+  if (anchorPt && anchorPage) {
+    const wrap = document.querySelector(`#pages .page[data-page="${anchorPage}"]`);
+    if (wrap) {
+      const r = wrap.getBoundingClientRect();
+      const dx = (r.left + anchorPt.x * zoom) - anchor.x;
+      const dy = (r.top + anchorPt.y * zoom) - anchor.y;
+      const viewer = $('#viewer');
+      const scroller = (viewer.scrollHeight > viewer.clientHeight + 1) ? viewer : window;
+      scroller.scrollBy(dx, dy);
+    }
+  }
+  zoomRendering = false;
+  if (pendingZoom) { const p = pendingZoom; pendingZoom = null; await applyZoom(p.z, p.anchor); }
 }
+function setZoom(z) { applyZoom(z, null); }
 $('#zoomIn').addEventListener('click', () => setZoom(zoom * 1.25));
 $('#zoomOut').addEventListener('click', () => setZoom(zoom / 1.25));
+
+/* ---------- Cubit dua jari untuk zoom ---------- */
+const viewerEl = $('#viewer');
+const pinchPointers = new Map();
+viewerEl.addEventListener('pointerdown', (e) => {
+  if (!pdfDoc) return;
+  pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinchPointers.size === 2) {
+    const [a, b] = [...pinchPointers.values()];
+    pinchState = { startDist: Math.hypot(a.x - b.x, a.y - b.y), startZoom: zoom, lastZoom: zoom, center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+    gestureCancels.forEach((c) => { try { c(); } catch (_) {} });
+    viewerEl.style.touchAction = 'none';
+  }
+}, true);
+viewerEl.addEventListener('pointermove', (e) => {
+  if (!pinchPointers.has(e.pointerId)) return;
+  pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinchState && pinchPointers.size === 2) {
+    const [a, b] = [...pinchPointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchState.startDist > 0 && dist > 0) {
+      const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const z = pinchState.startZoom * dist / pinchState.startDist;
+      pinchState.lastZoom = z; pinchState.center = center;
+      if (Math.abs(z - zoom) > 0.01) applyZoom(z, center);
+    }
+  }
+});
+function endPinchPointer(e) {
+  pinchPointers.delete(e.pointerId);
+  if (pinchState && pinchPointers.size < 2) {
+    const last = pinchState; pinchState = null;
+    viewerEl.style.touchAction = '';
+    if (Math.abs(last.lastZoom - zoom) > 0.01) applyZoom(last.lastZoom, last.center);
+  }
+}
+viewerEl.addEventListener('pointerup', endPinchPointer);
+viewerEl.addEventListener('pointercancel', endPinchPointer);
 
 /* ---------- Deteksi kotak ceklis & kolom tanda tangan ---------- */
 $('#btnDetect').addEventListener('click', async () => {
