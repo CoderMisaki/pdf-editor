@@ -40,6 +40,17 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   ini mengembalikannya persis ke tengah kotak asalnya dengan ukuran
   pas (sisi terpendek kotak). Centang baru juga menyimpan ukuran
   kotaknya, jadi tombol ini selalu tepat.
+- **Unduh = kunci (apply) otomatis** — tombol **Unduh PDF** tidak
+  hanya menyimpan editanmu, tapi juga mengunci isi form: nilai tiap
+  kolom dibakar menjadi konten halaman permanen, lalu kolom formnya
+  dihapus. Hasil unduhan tampil persis seperti di editor di viewer
+  mana pun — tidak ada lagi kolom yang bisa di-highlight viewer
+  (kuning/hijau). File asli tidak diubah; yang terkunci hanya hasil
+  unduhan, jadi kolom di hasil unduhan tidak bisa diedit lagi —
+  kalau mau mengubah isi kolom, edit file aslinya lalu unduh ulang.
+  (flatten bawaan pdf-lib tidak dipakai karena gagal di tengah jalan
+  untuk form seperti W-8BEN; penguncinya ditulis manual dan tahan
+  terhadap kotak centang tanpa tampilan Off.)
 - **Zoom cubit dua jari** — di HP, cubit/mekarkan dua jari di atas halaman
   untuk zoom in/out; zoom mengarah ke titik tengah cubitan (bukan ke tengah
   halaman), jadi bisa menargetkan area yang ingin diperbesar. Tombol
