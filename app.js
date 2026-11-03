@@ -78,6 +78,34 @@ $('#sigSizeInput').addEventListener('input', (e) => {
   }
   if (el && el.type === 'sig') { pushHistory(); el.w = +e.target.value; el.h = el.w * el.aspect; renderOverlays(); }
 });
+function stepSlider(id, step) {
+  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk mengubah ukuran.'); return; }
+  const s = $(id);
+  s.value = Math.min(+s.max, Math.max(+s.min, +s.value + step));
+  s.dispatchEvent(new Event('input'));
+}
+$('#btnSigSizeMinus').addEventListener('click', () => stepSlider('#sigSizeInput', -10));
+$('#btnSigSizePlus').addEventListener('click', () => stepSlider('#sigSizeInput', 10));
+$('#checkSizeInput').addEventListener('input', (e) => {
+  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk mengubah ukuran centang.'); return; }
+  $('#checkSizeVal').textContent = e.target.value;
+  // Sama seperti tanda tangan: centang terpilih, atau centang terakhir dibuat.
+  let el = findSelected();
+  if ((!el || el.type !== 'check') && lastCheckId) {
+    for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastCheckId); if (f) { el = f; selectedId = f.id; break; } }
+  }
+  if (el && el.type === 'check') {
+    pushHistory();
+    const s = +e.target.value;
+    const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    el.size = s; el.x = cx - s / 2; el.y = cy - s / 2;
+    el.points = [[cx - s * 0.35, cy + s * 0.05], [cx - s * 0.08, cy + s * 0.32], [cx + s * 0.38, cy - s * 0.32]];
+    renderOverlays();
+  }
+});
+$('#btnCheckSizeMinus').addEventListener('click', () => stepSlider('#checkSizeInput', -1));
+$('#btnCheckSizePlus').addEventListener('click', () => stepSlider('#checkSizeInput', 1));
 function doUndo() {
   if (!history.length) return;
   redoStack.push(JSON.stringify(elements));
@@ -296,6 +324,7 @@ function attachOverlay(overlay, pageNum) {
           points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 };
         els(pageNum).push(cel);
         lastCheckId = cel.id; // tombol arah "Geser ceklis" menggerakkan centang terakhir ini
+        $('#checkSizeInput').value = size; $('#checkSizeVal').textContent = size; // slider mengikuti ukuran centang ini
       }
       renderOverlays(); setStatus();
       return;
@@ -339,7 +368,7 @@ function attachOverlay(overlay, pageNum) {
         if (el) {
           selectedId = el.id; renderOverlays();
           if (el.type === 'sig') lastSigId = el.id;
-          if (el.type === 'check') lastCheckId = el.id;
+          if (el.type === 'check') { lastCheckId = el.id; $('#checkSizeInput').value = el.size; $('#checkSizeVal').textContent = el.size; }
           if (sigLocked) return; // terkunci: boleh dipilih, tidak boleh digeser
           normXY(el);
           drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
@@ -354,7 +383,7 @@ function attachOverlay(overlay, pageNum) {
     if (mode === 'check' && targetEl) {
       const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
       if (el && el.type === 'check') {
-        selectedId = el.id; lastCheckId = el.id; renderOverlays();
+        selectedId = el.id; lastCheckId = el.id; $('#checkSizeInput').value = el.size; $('#checkSizeVal').textContent = el.size; renderOverlays();
         normXY(el);
         drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
         overlay.style.touchAction = 'none';

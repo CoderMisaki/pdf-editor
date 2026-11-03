@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDF Editor Gratis — Teks, Pensil, Tanda Tangan & Ceklis</title>
-<link rel="stylesheet" href="style.css?v=1.7">
+<link rel="stylesheet" href="style.css?v=1.8">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
@@ -35,7 +35,8 @@
     <label>Warna <input type="color" id="colorInput" value="#000000"></label>
     <label>Garis <input type="range" id="widthInput" min="1" max="8" value="2"> <span id="widthVal">2</span>px</label>
     <label>Ukuran teks <input type="range" id="fontInput" min="10" max="36" value="16"> <span id="fontVal">16</span></label>
-    <label>Uk. tanda tangan <input type="range" id="sigSizeInput" min="60" max="300" value="150"> <span id="sigSizeVal">150</span>pt</label>
+    <label>Uk. tanda tangan <button class="btn small" id="btnSigSizeMinus">−</button><input type="range" id="sigSizeInput" min="60" max="300" value="150"><button class="btn small" id="btnSigSizePlus">+</button> <span id="sigSizeVal">150</span>pt</label>
+    <label>Uk. ceklis <button class="btn small" id="btnCheckSizeMinus">−</button><input type="range" id="checkSizeInput" min="6" max="40" value="18"><button class="btn small" id="btnCheckSizePlus">+</button> <span id="checkSizeVal">18</span>pt</label>
     <span class="nudge-group">Geser tanda tangan: <button class="btn small" id="btnNudgeSigLeft">←</button><button class="btn small" id="btnNudgeSigUp">↑</button><button class="btn small" id="btnNudgeSigDown">↓</button><button class="btn small" id="btnNudgeSigRight">→</button></span>
     <span class="nudge-group">Geser ceklis: <button class="btn small" id="btnNudgeCheckLeft">←</button><button class="btn small" id="btnNudgeCheckUp">↑</button><button class="btn small" id="btnNudgeCheckDown">↓</button><button class="btn small" id="btnNudgeCheckRight">→</button></span>
     <button class="btn small" id="btnSigPad">Buat / unggah tanda tangan</button>
@@ -79,6 +80,6 @@
   </div>
 </div>
 
-<script src="app.js?v=1.7"></script>
+<script src="app.js?v=1.8"></script>
 </body>
 </html>
