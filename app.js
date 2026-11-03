@@ -19,6 +19,7 @@ const gestureCancels = []; // diisi tiap attachOverlay, dikosongkan tiap renderP
 let history = [];
 let redoStack = [];
 let lastSigId = null;
+let lastCheckId = null;
 let pageInfo = {};             // { pageNum: {widthPt, heightPt} }
 
 const uid = () => 'el' + Math.random().toString(36).slice(2, 9);
@@ -59,7 +60,7 @@ document.querySelectorAll('.mode').forEach((b) => {
       mode === 'text' ? 'Mode Teks: klik di halaman, ketik, lalu klik di luar kotak untuk menyimpan.' :
       mode === 'pencil' ? 'Mode Pensil: seret di halaman untuk menggambar bebas (mis. mencentang manual).' :
       mode === 'signature' ? 'Mode Tanda tangan: klik di halaman untuk menempel tanda tangan. Seret untuk memindah, tarik gagang biru untuk mengubah ukuran.' :
-      mode === 'check' ? 'Mode Ceklis: ketuk di kotak oranye (atau dekat kotaknya) — centang otomatis menempel pas di tengah kotak. Ketuk lagi untuk membatalkan. Seret centang yang ada untuk memindahkannya. Ketukan jauh dari kotak tidak menambah apa-apa.' :
+      mode === 'check' ? 'Mode Ceklis: ketuk di kotak oranye (atau dekat kotaknya) — centang otomatis menempel pas di tengah kotak. Ketuk lagi untuk membatalkan. Untuk menggeser centang, pakai tombol arah "Geser ceklis" di toolbar (atau seret centangnya langsung). Ketukan jauh dari kotak tidak menambah apa-apa.' :
       'Mode Pilih: klik elemen untuk memilih, seret untuk memindah, tombol Delete untuk menghapus.'
     );
   });
@@ -131,7 +132,7 @@ async function loadPdfFile(file) {
     pdfBytes = buf.slice(0);
     fileName = file.name.replace(/\.pdf$/i, '');
     pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
-    elements = {}; detected = {}; history = []; redoStack = []; selectedId = null; lastSigId = null; updateUndoRedo();
+    elements = {}; detected = {}; history = []; redoStack = []; selectedId = null; lastSigId = null; lastCheckId = null; updateUndoRedo();
     dropzone.style.display = 'none';
     $('#btnDetect').disabled = false; $('#btnDownload').disabled = false;
     setHint('PDF dimuat. Pilih alat di atas, lalu kerjakan langsung di halaman.');
@@ -291,8 +292,10 @@ function attachOverlay(overlay, pageNum) {
       else {
         // Centang selalu terpusat di tengah kotak, berapa pun bentuk kotaknya.
         const size = Math.min(box.w, box.h), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-        els(pageNum).push({ id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
-          points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 });
+        const cel = { id: uid(), type: 'check', page: pageNum, x: cx - size / 2, y: cy - size / 2, size, boxX: box.x, boxY: box.y, color: $('#colorInput').value,
+          points: [[cx - size * 0.35, cy + size * 0.05], [cx - size * 0.08, cy + size * 0.32], [cx + size * 0.38, cy - size * 0.32]], width: 2.5 };
+        els(pageNum).push(cel);
+        lastCheckId = cel.id; // tombol arah "Geser ceklis" menggerakkan centang terakhir ini
       }
       renderOverlays(); setStatus();
       return;
@@ -335,6 +338,8 @@ function attachOverlay(overlay, pageNum) {
         const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
         if (el) {
           selectedId = el.id; renderOverlays();
+          if (el.type === 'sig') lastSigId = el.id;
+          if (el.type === 'check') lastCheckId = el.id;
           if (sigLocked) return; // terkunci: boleh dipilih, tidak boleh digeser
           normXY(el);
           drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
@@ -349,7 +354,7 @@ function attachOverlay(overlay, pageNum) {
     if (mode === 'check' && targetEl) {
       const el = els(pageNum).find((x) => x.id === targetEl.dataset.id);
       if (el && el.type === 'check') {
-        selectedId = el.id; renderOverlays();
+        selectedId = el.id; lastCheckId = el.id; renderOverlays();
         normXY(el);
         drag = { kind: 'move', el, dx: pt.x - el.x, dy: pt.y - el.y, moved: false, pending: true, startCX: e.clientX, startCY: e.clientY, snapshot: JSON.stringify(elements) };
         overlay.style.touchAction = 'none';
@@ -465,24 +470,35 @@ $('#btnSigLock').addEventListener('click', () => {
   setHint(sigLocked ? 'TERKUNCI: semua edit dimatikan (teks, pensil, ceklis, tanda tangan, geser, ubah ukuran). Scroll tetap bisa. Buka kunci untuk mengedit lagi.' : 'Kunci dibuka: semua alat bisa dipakai lagi.');
   renderOverlays();
 });
-function nudgeEl(dx, dy) {
+function nudgeSig(dx, dy) {
   if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk menggeser.'); return; }
   let el = findSelected();
-  if (!el && lastSigId) {
+  if ((!el || el.type !== 'sig') && lastSigId) {
     for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastSigId); if (f) { el = f; selectedId = f.id; break; } }
   }
-  if (!el) { setHint('Pilih elemen dulu (mode Pilih, ketuk elemennya), lalu pakai tombol arah.'); return; }
-  pushHistory();
-  if (el.type === 'check' || el.type === 'draw') {
-    if (el.x === undefined) { const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]); el.x = Math.min(...xs); el.y = Math.min(...ys); }
-    el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
+  if (!el || el.type !== 'sig') { setHint('Buat tanda tangan dulu, lalu pakai tombol arah "Geser tanda tangan".'); return; }
+  pushHistory(); el.x += dx; el.y += dy; renderOverlays(); setStatus();
+}
+function nudgeCheck(dx, dy) {
+  if (sigLocked) { setHint('Terkunci: buka kunci dulu untuk menggeser.'); return; }
+  let el = findSelected();
+  if ((!el || el.type !== 'check') && lastCheckId) {
+    for (const p of Object.values(elements)) { const f = p.find((x) => x.id === lastCheckId); if (f) { el = f; selectedId = f.id; break; } }
   }
+  if (!el || el.type !== 'check') { setHint('Buat centang dulu (ketuk kotak oranye), lalu pakai tombol arah "Geser ceklis".'); return; }
+  pushHistory();
+  if (el.x === undefined) { const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]); el.x = Math.min(...xs); el.y = Math.min(...ys); }
+  el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
   el.x += dx; el.y += dy; renderOverlays(); setStatus();
 }
-$('#btnNudgeLeft').addEventListener('click', () => nudgeEl(-6, 0));
-$('#btnNudgeRight').addEventListener('click', () => nudgeEl(6, 0));
-$('#btnNudgeUp').addEventListener('click', () => nudgeEl(0, -6));
-$('#btnNudgeDown').addEventListener('click', () => nudgeEl(0, 6));
+$('#btnNudgeSigLeft').addEventListener('click', () => nudgeSig(-6, 0));
+$('#btnNudgeSigRight').addEventListener('click', () => nudgeSig(6, 0));
+$('#btnNudgeSigUp').addEventListener('click', () => nudgeSig(0, -6));
+$('#btnNudgeSigDown').addEventListener('click', () => nudgeSig(0, 6));
+$('#btnNudgeCheckLeft').addEventListener('click', () => nudgeCheck(-6, 0));
+$('#btnNudgeCheckRight').addEventListener('click', () => nudgeCheck(6, 0));
+$('#btnNudgeCheckUp').addEventListener('click', () => nudgeCheck(0, -6));
+$('#btnNudgeCheckDown').addEventListener('click', () => nudgeCheck(0, 6));
 $('#btnSigClose').addEventListener('click', () => sigModal.classList.add('hidden'));
 $('#btnSigClear').addEventListener('click', () => { sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); sigTouched = false; });
 function sigPos(e) {
