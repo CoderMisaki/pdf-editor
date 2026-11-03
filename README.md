@@ -15,23 +15,26 @@ berjalan **lokal di browser** — file PDF tidak pernah diunggah ke server mana 
   baik di mode Tanda tangan maupun mode Pilih. Penempelan juga hanya
   terjadi pada ketukan murni (bukan saat scroll), jadi geser layar tidak
   menambah tanda tangan liar.
-- **Kunci tanda tangan** — tombol 🔓/🔒 di ujung kanan baris alat (nempel
-  di kanan atas layar, ikut sticky saat scroll). Saat terkunci, scroll
-  dan ketukan tidak akan menambah, memindah, atau mengubah ukuran tanda
-  tangan (tanda tangan yang sudah ada tetap tampil dan ikut ke-scroll
-  bersama halaman, tidak tertutup elemen lain). Matikan kunci untuk
-  menempel/mengedit lagi. Baris alat (Pilih–Ceklis) juga sticky di HP,
-  jadi tidak hilang saat halaman di-scroll.
+- **Kunci edit global** — tombol 🔓/🔒 di ujung kanan baris alat (nempel
+  di kanan atas layar, ikut sticky saat scroll). Saat terkunci, SEMUA
+  edit dimatikan: teks, pensil, ceklis, tanda tangan, geser, ubah ukuran,
+  hapus. Scroll tetap bisa, memilih elemen tetap bisa. Buka kunci dulu
+  baru bisa mengedit lagi.
+- **Geser tanda tangan** — seret langsung di halaman (di HP, gestur seret
+  pada tanda tangan kini tidak lagi direbut jadi scroll) atau pakai tombol
+  arah ← ↑ ↓ → (geser 6pt per ketuk, berlaku untuk tanda tangan yang
+  terpilih atau terakhir ditempel).
 - **Deteksi kotak & field** — tombol *Deteksi kotak & field* akan mencari:
   1. field formulir asli di PDF (kotak ceklis dan kolom tanda tangan), dan
   2. kotak kosong bergaris di halaman (untuk formulir hasil cetak/flatten).
   Kotak terdeteksi ditandai garis putus-putus oranye, kolom tanda tangan ungu.
-- **Ceklis otomatis** — di mode Ceklis, HANYA ketukan tepat di kotak kosong
-  yang terdeteksi yang menambah centang (pas di tengah kotaknya, berapa pun
-  bentuk kotaknya). Ketuk lagi untuk membatalkan. Ketukan di luar kotak
-  tidak menambah apa-apa, jadi scroll tidak mungkin lagi menabur centang
-  liar. (Coretan manual tetap bisa lewat Pensil bila perlu centang di luar
-  kotak.)
+- **Ceklis otomatis** — di mode Ceklis, ketukan di kotak kosong (atau di
+  dekat kotaknya, radius 14pt — karena kotak form kecil dan ketukan jari
+  tidak presisi) menambah centang yang menempel pas di tengah kotak
+  terdekat, berapa pun bentuk kotaknya. Ketuk lagi untuk membatalkan.
+  Ketukan jauh dari kotak tidak menambah apa-apa, jadi scroll tidak
+  mungkin lagi menabur centang liar. (Coretan manual tetap bisa lewat
+  Pensil bila perlu centang di luar kotak.)
 - **Pilih / geser / hapus / urungkan / ulangi** — klik elemen untuk
   memilih, seret untuk memindah, tombol Delete untuk menghapus, tombol
   Urungkan untuk membatalkan langkah terakhir, tombol Ulangi untuk
